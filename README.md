@@ -1,7 +1,7 @@
-Flask Form Boilerplate
+# Flask Form Boilerplate
 
 
-# Setup
+## Setup
 
 ### Create Virtual Environment
 
