@@ -27,6 +27,7 @@
 
       <p class="lead"><strong>{{ message }}</strong></p>
       <p><a href="{{ url_for('index') }}">Return to the index.</a></p>
+      <a href="mailto:?subject={{ subject }}&body={{ body }}">Send Email</a>
 
 
       {% else %}

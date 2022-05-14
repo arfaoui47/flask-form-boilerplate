@@ -73,6 +73,38 @@ class AddRecord(FlaskForm):
     submit = SubmitField("Add Record")
 
 
+def email_data(subject, name, quantity, updated):
+    # format body as html table
+    body = f"""<html>
+            <table width="600" style="border:1px solid #333">
+            <tr>
+            <td align="center">head</td>
+            </tr>
+            <tr>
+            <td align="center">
+                body 
+                <table align="center" width="300" border="0" cellspacing="0" cellpadding="0" style="border:1px solid #ccc;">
+                <tr>
+                    <td> Name  </td>
+                    <td> {name} </td>
+                </tr>
+                <tr>
+                    <td> Quantity  </td>
+                    <td> {quantity} </td>
+                </tr>
+                <tr>
+                    <td> Updated  </td>
+                    <td> {updated} </td>
+                </tr>
+                </table>
+            </td>
+            </tr>
+            </table>
+            </html>"""
+
+    return subject, body
+
+
 def stringdate():
     today = date.today()
     date_list = str(today).split("-")
@@ -83,8 +115,6 @@ def stringdate():
 
 # +++++++++++++++++++++++
 # routes
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     # get a list of unique values in the style column
@@ -99,7 +129,12 @@ def index():
         db.session.commit()
         # create a message to send to the template
         message = f"The data for {name} Entry has been submitted."
-        return render_template("index.html", message=message)
+        # update email subject
+        subject = "New Entry"
+        email_subject, body = email_data(subject, name, quantity, updated)
+        return render_template(
+            "index.html", message=message, subject=email_subject, body=body
+        )
     else:
         # show validaton errors
         # see https://pythonprogramming.net/flash-flask-tutorial/
