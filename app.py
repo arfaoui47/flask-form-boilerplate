@@ -1,8 +1,5 @@
-""" write to a SQLite database with forms, templates
-    add new record, delete a record, edit/update a record
-    """
-
-from flask import Flask, render_template, request, flash
+import json 
+from flask import Flask, render_template, request, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
 
@@ -13,8 +10,10 @@ from wtforms import (
     HiddenField,
     StringField,
     IntegerField,
+    SelectField,
 )
 from wtforms.validators import InputRequired, NumberRange
+from countries import countries
 from datetime import date
 
 app = Flask(__name__)
@@ -43,12 +42,15 @@ class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
     quantity = db.Column(db.Integer)
+    country = db.Column(db.String)
     updated = db.Column(db.String)
 
-    def __init__(self, name, quantity, updated):
+    def __init__(self, name, quantity, country, updated):
         self.name = name
         self.quantity = quantity
         self.updated = updated
+        self.country = country
+        
 
 
 engine = create_engine(f"sqlite:///{db_name}")
@@ -62,18 +64,20 @@ Entry.__table__.create(bind=engine, checkfirst=True)
 # each field includes validation requirements and messages
 class AddRecord(FlaskForm):
     # id used only by update/edit
+    country_choices = [(country, country) for country in countries]
     id_field = HiddenField()
     name = StringField("Name", [InputRequired()])
     quantity = IntegerField(
         "Quantity",
         [InputRequired(), NumberRange(min=1, max=999, message="Invalid range")],
     )
+    country = SelectField("Country", [InputRequired()], id="country", choices=country_choices)
     # updated - date - handled in the route
     updated = HiddenField()
     submit = SubmitField("Add Record")
 
 
-def email_data(subject, name, quantity, updated):
+def email_data(subject, name, quantity, country, updated):
     # format body as html table
     body = f"""<html>
             <table width="600" style="border:1px solid #333">
@@ -91,6 +95,10 @@ def email_data(subject, name, quantity, updated):
                 <tr>
                     <td> Quantity  </td>
                     <td> {quantity} </td>
+                </tr>
+                <tr>
+                    <td> Country  </td>
+                    <td> {country} </td>
                 </tr>
                 <tr>
                     <td> Updated  </td>
@@ -117,13 +125,30 @@ def stringdate():
 # routes
 @app.route("/", methods=["GET", "POST"])
 def index():
+    entries = Entry.query.all()
+    return render_template('index.html', entries=entries)
+
+# small form
+class DeleteForm(FlaskForm):
+    id_field = HiddenField()
+    purpose = HiddenField()
+    submit = SubmitField('Delete This entry')
+
+@app.route('/_autocomplete', methods=['GET'])
+def autocomplete():
+    return Response(json.dumps(countries), mimetype='application/json')
+
+
+@app.route('/add_record/', methods=['GET', 'POST'])
+def add_record():
     # get a list of unique values in the style column
     form1 = AddRecord()
     if form1.validate_on_submit():
         name = request.form["name"]
         quantity = request.form["quantity"]
+        country = request.form["country"]
         updated = stringdate()
-        record = Entry(name, quantity, updated)
+        record = Entry(name, quantity, country, updated)
         # Flask-SQLAlchemy magic adds record to database
         db.session.add(record)
         db.session.commit()
@@ -131,9 +156,9 @@ def index():
         message = f"The data for {name} Entry has been submitted."
         # update email subject
         subject = "New Entry"
-        email_subject, body = email_data(subject, name, quantity, updated)
+        email_subject, body = email_data(subject, name, quantity, country, updated)
         return render_template(
-            "index.html", message=message, subject=email_subject, body=body
+            "add_record.html", message=message, subject=email_subject, body=body, countries=countries
         )
     else:
         # show validaton errors
@@ -144,7 +169,59 @@ def index():
                     "Error in {}: {}".format(getattr(form1, field).label.text, error),
                     "error",
                 )
-        return render_template("index.html", form1=form1)
+        return render_template("add_record.html", form1=form1)
+
+@app.route('/edit_or_delete', methods=['POST'])
+def edit_or_delete():
+    id = request.form['id']
+    choice = request.form['choice']
+    entry = Entry.query.filter(Entry.id == id).first()
+    # two forms in this template
+    form1 = AddRecord()
+    form2 = DeleteForm()
+    return render_template('edit_or_delete.html', entry=entry, form1=form1, form2=form2, choice=choice, countries=countries)
+
+
+@app.route('/edit_result', methods=['POST'])
+def edit_result():
+    id = request.form['id_field']
+    # call up the record from the database
+    entry = Entry.query.filter(Entry.id == id).first()
+    # update all values
+    entry.name = request.form['name']
+    entry.quantity = request.form['quantity']
+    entry.country = request.form['country']
+    entry.updated = stringdate()
+
+    form1 = AddRecord()
+    if form1.validate_on_submit():
+        # update database record
+        db.session.commit()
+        # create a message to send to the template
+        message = f"The data for entry {entry.name} has been updated."
+        return render_template('result.html', message=message)
+    else:
+        # show validaton errors
+        entry.id = id
+        # see https://pythonprogramming.net/flash-flask-tutorial/
+        for field, errors in form1.errors.items():
+            for error in errors:
+                flash("Error in {}: {}".format(
+                    getattr(form1, field).label.text,
+                    error
+                ), 'error')
+        return render_template('edit_or_delete.html', form1=form1, entry=entry, choice='edit', countries=countries)
+
+@app.route('/delete_result', methods=['POST'])
+def delete_result():
+    id = request.form['id_field']
+    purpose = request.form['purpose']
+    entry = Entry.query.filter(Entry.id == id).first()
+    if purpose == 'delete':
+        db.session.delete(entry)
+        db.session.commit()
+        message = f"The entry {entry.name} has been deleted from the database."
+        return render_template('result.html', message=message)
 
 
 # +++++++++++++++++++++++

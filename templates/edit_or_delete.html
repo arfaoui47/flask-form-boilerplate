@@ -1,0 +1,145 @@
+{% extends 'bootstrap/base.html' %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+
+{% block styles %}
+{{ super() }}
+	<style>
+		body { background: #e8f1f9; }
+	</style>
+{% endblock %}
+
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.js"></script>
+</head>
+
+{% block title %}
+	{% if choice == 'delete' %}
+		Delete a Entry
+	{% elif choice == 'edit' %}
+		Edit a Entry
+	{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+<div class="container">
+  <div class="row pb-5">
+    <div class="col-lg-10 mx-lg-auto">
+
+      <h1 class="pt-5 pb-2">
+		{% if choice == 'delete' %}
+	  		Delete a Entry
+	  	{% elif choice == 'edit' %}
+	  		Edit a Entry
+	  	{% endif %}
+	  </h1>
+	  <!-- ----- THIS TEMPLATE HAS TWO FORMS ----- -->
+	  <!-- but only one will be visible, depending on how the template
+  		   was opened -->
+
+	  <!-- ----- start delete Entry content ----- -->
+
+	  {% if choice == 'delete' %}
+
+	      <p class="lead alert alert-danger">Are you sure you want to delete this Entry?</p>
+
+		  <!-- links -->
+		  <p class="ml-4">No. <a href="{{ url_for('index') }}">Return to the index.</a></p>
+
+
+		<!-- table showing the selected Entry -->
+		<table class="table">
+			<tr>
+				<th>Name</th>
+				<th>Quantity</th>
+				<th>Country</th>
+				<th>Updated</th>
+			</tr>
+
+			<!-- just one entry here -->
+			<tr>
+				<td>{{ entry.name }}</td>
+				<td>{{ entry.quantity }}</td>
+				<td>{{ entry.country }}</td>
+				<td>{{ entry.updated }}</td>
+			</tr>
+
+		</table>
+
+
+		<!-- start form for deleting record - not quickform but still WTForms -->
+  		<form action="{{ url_for('delete_result') }}" method="POST" id="delete">
+			{{ form2.csrf_token }}
+			{{ form2.id_field(value=entry.id) }}
+			{{ form2.purpose(value='delete') }}
+			{{ form2.submit(class="btn btn-danger space-below-btn") }}
+		</form>
+		<!-- end form -->
+
+
+		<!-- ----- end delete entry content ----- -->
+		{% else %}
+
+		<!-- ----- start edit entry content ----- -->
+
+		<p class="lead alert alert-success">Edit the selected entry below.</p>
+
+		<!-- links -->
+		<p><a href="{{ url_for('index') }}">Return to the index.</a></p>
+
+
+		<!-- show flash - based on WTForms validators
+			 see https://pythonprogramming.net/flash-flask-tutorial/
+			 get_flashed_messages() exists here because of flash()
+			 in the route function
+			 -->
+			 {% with errors = get_flashed_messages() %}
+				 {% if errors %}
+					 {% for err in errors %}
+					 <div class="alert alert-danger alert-dismissible" role="alert">
+						 <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+						 {{ err }}
+					 </div>
+					 {% endfor %}
+				 {% endif %}
+			 {% endwith %}
+		<!-- end of flash -->
+
+		<!-- start form for editing record
+			 correct use of WTF Bootstrap styles -->
+		<form method="post" action="{{ url_for('edit_result') }}" id="update">
+			{{ form1.csrf_token }}
+			{{ form1.id_field(value=entry.id) }}
+			{{ wtf.form_field(form1.name, value=entry.name) }}
+			{{ wtf.form_field(form1.quantity, value=entry.quantity) }}
+			{{ wtf.form_field(form1.country, value=entry.country) }}
+			{{ wtf.form_field(form1.submit, button_map={'submit':'success'}) }}
+		</form>
+
+
+		{% endif %}
+
+		</div>
+	</div>
+</div>
+
+
+{% endblock %}
+<script>
+  $( function() {
+    var availableTags = [
+        {% for country in countries %}
+            "{{country}}",
+        {% endfor %}
+    ];
+    $("#country").autocomplete({
+      source: availableTags
+    });
+  } );
+</script>
