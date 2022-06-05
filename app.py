@@ -77,41 +77,6 @@ class AddRecord(FlaskForm):
     submit = SubmitField("Add Record")
 
 
-def email_data(subject, name, quantity, country, updated):
-    # format body as html table
-    body = f"""<html>
-            <table width="600" style="border:1px solid #333">
-            <tr>
-            <td align="center">head</td>
-            </tr>
-            <tr>
-            <td align="center">
-                body 
-                <table align="center" width="300" border="0" cellspacing="0" cellpadding="0" style="border:1px solid #ccc;">
-                <tr>
-                    <td> Name  </td>
-                    <td> {name} </td>
-                </tr>
-                <tr>
-                    <td> Quantity  </td>
-                    <td> {quantity} </td>
-                </tr>
-                <tr>
-                    <td> Country  </td>
-                    <td> {country} </td>
-                </tr>
-                <tr>
-                    <td> Updated  </td>
-                    <td> {updated} </td>
-                </tr>
-                </table>
-            </td>
-            </tr>
-            </table>
-            </html>"""
-
-    return subject, body
-
 
 def stringdate():
     today = date.today()
@@ -125,22 +90,6 @@ def stringdate():
 # routes
 @app.route("/", methods=["GET", "POST"])
 def index():
-    entries = Entry.query.all()
-    return render_template('index.html', entries=entries)
-
-# small form
-class DeleteForm(FlaskForm):
-    id_field = HiddenField()
-    purpose = HiddenField()
-    submit = SubmitField('Delete This entry')
-
-@app.route('/_autocomplete', methods=['GET'])
-def autocomplete():
-    return Response(json.dumps(countries), mimetype='application/json')
-
-
-@app.route('/add_record/', methods=['GET', 'POST'])
-def add_record():
     # get a list of unique values in the style column
     form1 = AddRecord()
     if form1.validate_on_submit():
@@ -156,9 +105,8 @@ def add_record():
         message = f"The data for {name} Entry has been submitted."
         # update email subject
         subject = "New Entry"
-        email_subject, body = email_data(subject, name, quantity, country, updated)
         return render_template(
-            "add_record.html", message=message, subject=email_subject, body=body, countries=countries
+            "index.html", message=message, entity=record, countries=countries
         )
     else:
         # show validaton errors
@@ -169,7 +117,26 @@ def add_record():
                     "Error in {}: {}".format(getattr(form1, field).label.text, error),
                     "error",
                 )
-        return render_template("add_record.html", form1=form1)
+        return render_template("index.html", form1=form1)
+
+
+# small form
+class DeleteForm(FlaskForm):
+    id_field = HiddenField()
+    purpose = HiddenField()
+    submit = SubmitField('Delete This entry')
+
+
+@app.route('/_autocomplete', methods=['GET'])
+def autocomplete():
+    return Response(json.dumps(countries), mimetype='application/json')
+
+
+@app.route('/list_entries/', methods=['GET'])
+def list_entries():
+    entries = Entry.query.all()
+    return render_template('list_entries.html', entries=entries)
+
 
 @app.route('/edit_or_delete', methods=['POST'])
 def edit_or_delete():
